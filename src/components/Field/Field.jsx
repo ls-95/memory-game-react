@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Card from "./Card";
+import "./Field.css";
 
 const FieldStates = {
   START: "start",
@@ -7,16 +9,14 @@ const FieldStates = {
   WIN: "win",
 };
 
-const [fieldState, setFieldState] = useState(FieldStates.START);
-const [playerField, setPlayerField] = useState([]);
-const [checkLeft, setCheckLeft] = useState(cardsToMemorize);
+const MEMORY_TIMEOUT = 2000;
 
 function generateField(width, height, cardsToMemorize) {
   const field = Array.from({ length: height }, (_, row) =>
     Array.from({ length: width }, (_, column) => ({
       isChecked: false,
       isFlipped: false,
-      x: HTMLTableRowElement,
+      x: row,
       y: column,
     }))
   );
@@ -29,6 +29,7 @@ function generateField(width, height, cardsToMemorize) {
       i--;
       continue;
     }
+
     field[randomX][randomY].isChecked = true;
   }
 
@@ -55,15 +56,92 @@ function DisplayField({ playerField, onCardClick, isFlipped }) {
   });
 }
 
-useEffect(() => {
-  const newField = generateField(width, height, cardsToMemorize);
-  setPlayerField(newField);
-}, []);
+export default function Field({
+  width,
+  height,
+  cardsToMemorize,
+  onWin,
+  onLose,
+}) {
+  const [fieldState, setFieldState] = useState(FieldStates.START);
+  const [fields, setFields] = useState([]);
+  const [playerField, setPlayerField] = useState([]);
+  const [checkLeft, setCheckLeft] = useState(cardsToMemorize);
 
-useEffect(() => {
-  const timer = setTimeout(() => {
-    setFieldState(FieldStates.PLAY);
-  }, MEMORY_TIMEOUT);
+  function onCardClick(x, y) {
+    if (playerField[x][y].isFlipped) {
+      return;
+    }
 
-  return () => clearTimeout(timer);
-}, []);
+    if (!fields[x][y].isChecked) {
+      setPlayerField((playerField) => {
+        const newPlayerField = [...playerField];
+        newPlayerField[x][y].isFlipped = true;
+        newPlayerField[x][y].isWrong = true;
+
+        return newPlayerField;
+      });
+
+      setFieldState(FieldStates.LOSE);
+      onLose();
+      return;
+    }
+
+    setPlayerField((playerField) => {
+      const newPlayerField = [...playerField];
+      newPlayerField[x][y].isFlipped = true;
+
+      return newPlayerField;
+    });
+
+    setCheckLeft((checkLeft) => {
+      console.log("checkLeft", checkLeft);
+      if (checkLeft === 1) {
+        onWin();
+        setFieldState(FieldStates.WIN);
+      }
+
+      return checkLeft - 1;
+    });
+  }
+
+  useEffect(() => {
+    console.log("generate field", fields);
+    if (fieldState !== FieldStates.START) {
+      return;
+    }
+
+    const newField = generateField(width, height, cardsToMemorize);
+    console.log("newField", newField);
+
+    setFields(newField);
+    setPlayerField(newField);
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      console.log("set game");
+      setFieldState(FieldStates.PLAY);
+    }, MEMORY_TIMEOUT);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <div>
+      {fieldState === FieldStates.START ? (
+        <DisplayField playerField={fields} isFlipped={true} />
+      ) : fieldState === FieldStates.PLAY ? (
+        <DisplayField
+          playerField={playerField}
+          isFlipped={false}
+          onCardClick={onCardClick}
+        />
+      ) : fieldState === FieldStates.LOSE ? (
+        <DisplayField playerField={playerField} isFlipped={true} />
+      ) : (
+        <DisplayField playerField={playerField} isFlipped={true} />
+      )}
+    </div>
+  );
+}
